@@ -150,6 +150,9 @@ auto print(const char* message, ...) -> void {
 #if defined(PLATFORM_WINDOWS)
 #include <Windows.h>
 
+extern "C" void __chkstk() {};
+
+HINSTANCE hinstance;
 static HWND window;
 static HDC hdc;
 
@@ -174,7 +177,8 @@ auto static CALLBACK events(HWND h_wnd, UINT msg, WPARAM w_param, LPARAM l_param
 
 namespace xc::platform {
     auto initialize() -> bool {
-        auto const wc = WNDCLASS{{}, events, {}, {}, GetModuleHandle({}), {}, {}, {}, {}, "win"};
+        hinstance = GetModuleHandle({});
+        auto const wc = WNDCLASS{{}, events, {}, {}, hinstance, {}, {}, {}, {}, "win"};
         RegisterClass(&wc);
 
         window = CreateWindow("win", "", WS_TILEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, width, height, {}, {}, {}, {});
@@ -183,55 +187,68 @@ namespace xc::platform {
         hdc = GetDC(window);
 
         ShowWindow(window, SW_NORMAL);
+
+        print("Platform initialization successful\n");
+
         return true;
     }
 
     auto uninitialize() -> void {}
 
-    auto tick() -> bool {
+    auto tick() -> void {
         auto msg = MSG{};
         while (PeekMessage(&msg, {}, {}, {}, PM_REMOVE)) {
-            if (msg.message == WM_QUIT) return false;
+            if (msg.message == WM_QUIT) running = false;
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-        return true;
     }
-
-    auto window_handle() -> void* { return hdc; }
 
     auto exit(int const code) -> void { ExitProcess(code); }
 
-    auto print(char const* message, ...) -> void {
-        char out_message[32000];
-        memset(out_message, 0, 32000);
-        va_list arg_ptr;
-        va_start(arg_ptr, message);
-        va_end(arg_ptr);
+    auto load_library(char const* name) -> void* {
+        auto library = LoadLibrary(name);
+        if (!library) print("Failed to load library: %s\n", name);
+        return library;
+    }
 
-        DWORD bytes_written = 0u;
-        WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), message, strlen(message), &bytes_written, nullptr);
+    auto unload_library(void* library) -> void { FreeLibrary(reinterpret_cast<HMODULE>(library)); }
+
+    auto load_function(void* library, char const* name) -> void* {
+        auto function = GetProcAddress(reinterpret_cast<HMODULE>(library), name);
+        if (!function) print("Failed to load function: %s\n", name);
+        return function;
     }
 }
 
+
+auto print(const char* message, ...) -> void {
+    char buffer[256];
+    char* out_message = buffer;
+    size_t buffer_size = sizeof(buffer);
+
+    va_list arg_ptr;
+    va_start(arg_ptr, message);
+
+    auto formatted_length = wvsprintfA(out_message, message, arg_ptr);
+
+    if (static_cast<size_t>(formatted_length) >= buffer_size && (buffer_size *= 2) <= 32000)
+        out_message = static_cast<char*>(malloc(buffer_size));
+
+    if (out_message != buffer) formatted_length = wvsprintfA(out_message, message, arg_ptr);
+
+    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), out_message, formatted_length, nullptr, nullptr);
+
+    if (out_message != buffer) free(out_message);
+    va_end(arg_ptr);
+}
+
 extern "C" {
-    auto malloc(size_t size) -> void* {
-        malloc_size += size;
-        return HeapAlloc(GetProcessHeap(), 0, size);
-    }
-
-    auto free(void* ptr) noexcept -> void {
-        malloc_size -= HeapSize(GetProcessHeap(), 0, ptr);
-        HeapFree(GetProcessHeap(), 0, ptr);
-    }
-
-    auto free(void* ptr, size_t size) noexcept -> void {
-        malloc_size -= size;
-        HeapFree(GetProcessHeap(), 0, ptr);
-    }
+    auto __cdecl malloc(size_t size) -> void* { return HeapAlloc(GetProcessHeap(), 0, size); }
+    auto __cdecl free(void* ptr) -> void { HeapFree(GetProcessHeap(), 0, ptr); }
 
     #pragma function(memset)
-    auto memset(void *dest, int c, size_t count) -> void*
+    auto __cdecl memset(void *dest, int c, size_t count) -> void*
     {
         char *bytes = (char *)dest;
         while (count--)
@@ -242,7 +259,7 @@ extern "C" {
     }
 
     #pragma function(memcpy)
-    auto memcpy(void *dest, const void *src, size_t count) -> void*
+    auto __cdecl memcpy(void *dest, const void *src, size_t count) -> void*
     {
         char *dest8 = (char *)dest;
         const char *src8 = (const char *)src;

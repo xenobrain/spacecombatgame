@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(SpaceCombatGame VERSION 0.0.1 LANGUAGES CXX OBJCXX)
+project(SpaceCombatGame VERSION 0.0.1 LANGUAGES CXX)
 
 
 # Configuration ########################################################################################################
@@ -47,7 +47,8 @@ set(PROJECT_INCLUDE_DIRECTORIES source)
 # Project Compile Definitions ###########################################################################################
 set(PROJECT_COMPILE_DEFINITIONS)
 
-if(_WIN32)
+if(WIN32)
+    message("Using Windows Platform")
     list(APPEND PROJECT_COMPILE_DEFINITIONS
             PLATFORM_WINDOWS
             NOMINMAX
@@ -148,6 +149,7 @@ endif()
 
 # Project Compile Options ##############################################################################################
 set(MSVC_COMPILE_OPTIONS
+        /Gs10000000 # Disable stack probes
         /sdl-       # Disable recommended security checks
         /GS-        # Disable buffer security checks
         /Oi         # Generate intrinsic functions
@@ -212,7 +214,7 @@ target_sources(platform PRIVATE
         source/engine/platform/platform_system.cpp
         source/engine/platform/platform_system.h
         source/engine/platform/platform_types.h)
-if(_WIN32)
+if(WIN32)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     find_library(COCOA_LIBRARY Cocoa)
@@ -236,8 +238,10 @@ if(ENGINE_RENDERER STREQUAL METAL)
     find_library(METAL_LIBRARY Metal)
     target_link_libraries(renderer PRIVATE ${METAL_LIBRARY})
     target_compile_definitions(renderer PRIVATE RENDERER_METAL)
-
-    set_source_files_properties(source/engine/renderer/renderer_system.cpp PROPERTIES LANGUAGE OBJCXX)
+    if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        enable_language(OBJCXX)
+        set_source_files_properties(source/engine/renderer/renderer_system.cpp PROPERTIES LANGUAGE OBJCXX)
+    endif()
 elseif(ENGINE_RENDERER STREQUAL OPENGL)
     message("Using OpenGL Renderer")
     target_compile_definitions(renderer PRIVATE RENDERER_OPENGL)
@@ -248,8 +252,14 @@ elseif(ENGINE_RENDERER STREQUAL VULKAN)
     target_compile_definitions(renderer PRIVATE
             RENDERER_VULKAN
             VK_NO_PROTOTYPES
-            VK_USE_PLATFORM_METAL_EXT
             VK_ENABLE_BETA_EXTENSIONS)
+    if(WIN32)
+        target_compile_definitions(renderer PRIVATE VK_USE_PLATFORM_WIN32_KHR)
+    elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+        target_compile_definitions(renderer PRIVATE VK_USE_PLATFORM_XCB_KHR)
+    elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+        target_compile_definitions(renderer PRIVATE VK_USE_PLATFORM_METAL_EXT)
+    endif()
 endif()
 
 
@@ -259,7 +269,7 @@ target_include_directories(game PRIVATE ${PROJECT_INCLUDE_DIRECTORIES})
 target_compile_definitions(game PRIVATE ${PROJECT_COMPILE_DEFINITIONS})
 target_compile_features(game PRIVATE ${PROJECT_COMPILE_FEATURES})
 target_compile_options(game PRIVATE ${PROJECT_COMPILE_OPTIONS})
-target_link_libraries(game PRIVATE core platform)
+target_link_libraries(game PRIVATE core platform renderer)
 target_link_options(game PRIVATE ${PROJECT_LINK_OPTIONS})
 target_sources(game PRIVATE
         source/game/game.cpp)

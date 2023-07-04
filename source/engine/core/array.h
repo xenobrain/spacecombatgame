@@ -7,7 +7,7 @@ namespace xc {
     template<typename T, typename Allocator = default_allocator<T>> class array {
     public:
         template<typename... Args> explicit array(Args&&... args) { push_back(move(args)...); }
-        ~array() { clear(); }
+        //~array() { clear(); } // no destructor because it triggers SEH.  Call clear() manually for now
 
         template<typename... Args> auto push_back(Args&&... args) -> void {
             if ((_size + sizeof...(Args)) > _capacity) reserve(_capacity == 0 ? 1 : (_capacity + sizeof...(Args)) * 2);

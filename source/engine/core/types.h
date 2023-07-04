@@ -30,10 +30,10 @@
 
 
 extern "C" {
-    auto extern memcpy(void *dest, const void *src, size_t size) -> void*;
-    auto extern memset(void *ptr, int value, size_t size) -> void*;
-    auto extern malloc(size_t size) -> void*;
-    auto extern free(void *ptr) -> void;
+    auto extern __cdecl memcpy(void *dest, const void *src, size_t size) -> void*;
+    auto extern __cdecl memset(void *ptr, int value, size_t size) -> void*;
+    auto extern __cdecl malloc(size_t size) -> void*;
+    auto extern __cdecl free(void *ptr) -> void;
 }
 
 constexpr auto wyhash(uint64_t key)-> uint64_t {
