@@ -216,6 +216,9 @@ target_sources(platform PRIVATE
         source/engine/platform/platform_types.h)
 if(WIN32)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    find_package(X11 REQUIRED)
+    include_directories(${X11_INCLUDE_DIR})
+    target_link_libraries(platform PRIVATE ${X11_LIBRARIES})
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     find_library(COCOA_LIBRARY Cocoa)
     target_link_libraries(platform PRIVATE dl ${COCOA_LIBRARY})
@@ -264,7 +267,7 @@ endif()
 
 
 # Build Game Library ###################################################################################################
-add_executable(game)
+add_executable(game WIN32)
 target_include_directories(game PRIVATE ${PROJECT_INCLUDE_DIRECTORIES})
 target_compile_definitions(game PRIVATE ${PROJECT_COMPILE_DEFINITIONS})
 target_compile_features(game PRIVATE ${PROJECT_COMPILE_FEATURES})

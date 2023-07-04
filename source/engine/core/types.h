@@ -8,32 +8,38 @@
 #define move(x) static_cast<decltype(x)&&>(x)
 
 #if defined(_WIN32) && defined(_MSC_VER)
+#define CDECL __cdecl
 #ifdef DEBUG
         #define DEBUG_BREAK __debugbreak()
     #else
         #define DEBUG_BREAK do {} while (0)
     #endif
 #elif defined(__APPLE__)
+#define CDECL
 #ifdef DEBUG
 #define DEBUG_BREAK __builtin_debugtrap()
 #else
 #define DEBUG_BREAK do {} while (0)
 #endif
-#elif defined(__linux__)
+#elif defined(PLATFORM_LINUX)
+#define CDECL
+
 #include <signal.h>
     #ifdef DEBUG
         #define DEBUG_BREAK raise(SIGTRAP)
     #else
         #define DEBUG_BREAK do {} while (0)
     #endif
+#else
+#define CDECL
 #endif
 
 
 extern "C" {
-    auto extern __cdecl memcpy(void *dest, const void *src, size_t size) -> void*;
-    auto extern __cdecl memset(void *ptr, int value, size_t size) -> void*;
-    auto extern __cdecl malloc(size_t size) -> void*;
-    auto extern __cdecl free(void *ptr) -> void;
+    auto extern CDECL memcpy(void *dest, const void *src, size_t size) -> void*;
+    auto extern CDECL memset(void *ptr, int value, size_t size) -> void*;
+    auto extern CDECL malloc(size_t size) -> void*;
+    auto extern CDECL free(void *ptr) -> void;
 }
 
 constexpr auto wyhash(uint64_t key)-> uint64_t {

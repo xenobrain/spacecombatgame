@@ -219,7 +219,13 @@ void main() {
 using GLchar = char;
 using GLintptr = ptrdiff_t;
 using GLsizeiptr = ptrdiff_t;
-using wglGetProcAddressproc = PROC WINAPI (LPCSTR lpszProc);
+
+using PFN_wglCreateContext = HGLRC(WINAPI*)(HDC);
+using PFN_wglDeleteContext = BOOL(WINAPI*)(HGLRC);
+using PFN_wglGetProcAddress = PROC(WINAPI*)(LPCSTR);
+using PFN_wglGetCurrentDC = HDC(WINAPI*)(void);
+using PFN_wglGetCurrentContext = HGLRC(WINAPI*)(void);
+using PFN_wglMakeCurrent = BOOL(WINAPI*)(HDC, HGLRC);
 
 static HDC hdc;
 static HGLRC context;
@@ -257,30 +263,27 @@ auto static compile_shader(char const* source, GLuint type) -> GLuint {
 
 namespace xc::renderer {
     auto initialize() -> bool {
-        #if defined(PLATFORM_WINDOWS)
-        hdc = reinterpret_cast<HDC>(platform::window_handle());
-
+#if defined(PLATFORM_WINDOWS)
         SetPixelFormat(hdc, ChoosePixelFormat(hdc, &pfd), &pfd);
-        context = wglCreateContext(hdc);
-        wglMakeCurrent(hdc, context);
 
-        #define GL_EXTENSION(ret, name, ...)                    \
-        gl##name = (PFN_##name*)wglGetProcAddress("gl" #name); \
+        auto library = platform::load_library("OpenGL32.dll");
+
+        context = ((PFN_wglCreateContext)platform::load_function(library, "wglCreateContext"))(hdc);
+        ((PFN_wglMakeCurrent)platform::load_function(library, "wglMakeCurrent"))(hdc, context);
+
+
+        auto wgl_get_proc_address = (PFN_wglGetProcAddress)platform::load_function(library, "wglGetProcAddress");
+
+
+
+#define GL_EXTENSION(ret, name, ...)                    \
+        gl##name = (PFN_##name*)wgl_get_proc_address("gl" #name); \
         if (!gl##name) return false;
         GL_EXTENSION_LIST
-        #undef GL_EXTENSION
+#undef GL_EXTENSION
 
-        #endif // PLATFORM_WINDOWS
+#endif // PLATFORM_WINDOWS
 
-        #if defined(PLATFORM_SDL3)
-        context = SDL_GL_CreateContext(platform::window_handle());
-
-        #define GL_EXTENSION(ret, name, ...) \
-        gl##name = reinterpret_cast<PFN_##name*>(SDL_GL_GetProcAddress("gl" #name)); \
-        if (!gl##name) return false;
-        GL_EXTENSION_LIST
-        #undef GL_EXTENSION
-        #endif
 
         auto program = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fs_shader);
         glUseProgram(program);
@@ -293,26 +296,24 @@ namespace xc::renderer {
     }
 
     auto uninitialize() -> void {
-        #if defined(PLATFORM_WINDOWS)
-        wglDeleteContext(context);
-        #endif
-
-        #if defined(PLATFORM_SDL3)
-        SDL_GL_DeleteContext(context);
-        #endif
+#if defined(PLATFORM_WINDOWS)
+       // (PFN_wglDeleteContext)(platform::load_function(libary, "wglDeleteContext"))
+       //wglDeleteContext(context);
+#endif
     }
 
-    auto tick() -> bool {
-        glRects(-1,-1,1,1);
+    auto tick() -> void {
+        //glRects(-1, -1, 1, 1);
         swap();
-        return true;
     }
 
     ///// Shaders //////////////////////////////////////////////////////////////////////////////////////////////////////////
-    auto create_shader(char const* vertex_shader_path, char const* fragment_shader_path) -> uint32_t {
-    #if defined(PLATFORM_WINDOWS)
-        auto vertex_shader_file = CreateFile(vertex_shader_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        auto fragment_shader_file = CreateFile(fragment_shader_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    auto create_shader(char const *vertex_shader_path, char const *fragment_shader_path) -> uint32_t {
+#if defined(PLATFORM_WINDOWS)
+        auto vertex_shader_file = CreateFile(vertex_shader_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                             FILE_ATTRIBUTE_NORMAL, NULL);
+        auto fragment_shader_file = CreateFile(fragment_shader_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+                                               FILE_ATTRIBUTE_NORMAL, NULL);
 
         // error handling
 
@@ -326,13 +327,14 @@ namespace xc::renderer {
 
         CloseHandle(vertex_shader_file);
         CloseHandle(fragment_shader_file);
-    #endif
+#endif
 
         return 0u;
     }
 
     /// Swapchain //////////////////////////////////////////////////////////////////////////////////////////////////////////
     auto swap() -> void { SwapBuffers(hdc); }
+} // namespace xc::renderer
 #endif
 
 
@@ -530,6 +532,16 @@ auto static create_surface() -> VkSurfaceKHR {
     VK_CHECK(vkCreateMetalSurfaceEXT(instance, &surface_create_info, {}, &surface));
     return surface;
 }
+#endif
+
+#if defined(PLATFORM_LINUX)
+#define LIBRARY_NAME "libvulkan.so"
+
+auto static create_surface(VkInstance const& instance) -> VkSurfaceKHR {
+    auto surface = VkSurfaceKHR{};
+    return surface;
+}
+
 #endif
 
 #if defined(PLATFORM_WINDOWS)
