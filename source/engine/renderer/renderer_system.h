@@ -8,9 +8,18 @@ namespace xc::renderer {
     auto uninitialize() -> void;
     auto tick() -> void;
 
+    // Shaders
     auto create_shader(char const* vs_source, char const* fs_source) -> shader_t;
     auto bind_shader(shader_t const& shader) -> void;
-    auto set_shader_uniform_float3(shader_t const& shader, char const* name, float u1, float u2, float u3) -> void;
+
+    auto set_shader_uniform(shader_t const& shader, char const* name, vector<float,1> const& value) -> void;
+    auto set_shader_uniform(shader_t const& shader, char const* name, vector<float,2> const& value) -> void;
+    auto set_shader_uniform(shader_t const& shader, char const* name, vector<float,3> const& value) -> void;
+    auto set_shader_uniform(shader_t const& shader, char const* name, vector<float,4> const& value) -> void;
+    auto set_shader_uniform(shader_t const& shader, char const* name, matrix<float,1,1> const& value) -> void;
+    auto set_shader_uniform(shader_t const& shader, char const* name, matrix<float,2,2> const& value) -> void;
+    auto set_shader_uniform(shader_t const& shader, char const* name, matrix<float,3,3> const& value) -> void;
+    auto set_shader_uniform(shader_t const& shader, char const* name, matrix<float,4,4> const& value) -> void;
 
     auto swap() -> void;
 }

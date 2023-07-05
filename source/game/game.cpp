@@ -184,7 +184,9 @@ extern "C" auto entry() -> void {
     if (!xc::renderer::initialize()) xc::platform::exit(-1);
 
     auto shader = xc::renderer::create_shader({}, fs_shader);
-    xc::renderer::set_shader_uniform_float3(shader, "position", 0.f, 0.5f, 0.f);
+
+    xc::renderer::bind_shader(shader);
+    xc::renderer::set_shader_uniform(shader, "position", xc::vector3{0.f, 0.5f, 0.f});
 
     while (running) {
         xc::platform::tick();

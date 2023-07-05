@@ -66,22 +66,62 @@ using GLsizeiptr = ptrdiff_t;
 
 
 // OpenGL Extensions ///////////////////////////////////////////////////////////////////////////////////////////////////
-#define GL_EXTENSION_LIST \
-GL_EXTENSION(GLuint, CreateShader, GLenum type)                                                             \
-GL_EXTENSION(GLuint, CreateShaderProgramv, GLenum type, GLsizei count, GLchar const* const* strings)        \
-GL_EXTENSION(void, CompileShader, GLuint shader)                                                            \
-GL_EXTENSION(void, ShaderSource, GLuint shader, GLsizei count, GLchar const** string, GLint const* length)  \
-GL_EXTENSION(void, UseProgram, GLuint program)                                                              \
-GL_EXTENSION(GLint, GetUniformLocation, GLuint program, GLchar const* name)                                 \
-GL_EXTENSION(void, Uniform3f, GLint location, GLfloat v0, GLfloat v1, GLfloat v2)                           \
+#define GL_EXTENSION_LIST                                                                                              \
+/* Shaders */                                                                                                          \
+GL_EXTENSION(void, AttachShader, GLuint, GLuint)                                                                       \
+GL_EXTENSION(void, CompileShader, GLuint shader)                                                                       \
+GL_EXTENSION(GLuint, CreateShader, GLenum type)                                                                        \
+GL_EXTENSION(void, DeleteShader, GLuint)                                                                               \
+GL_EXTENSION(void, ShaderSource, GLuint shader, GLsizei count, GLchar const** string, GLint const* length)             \
+/* Programs */                                                                                                         \
+GL_EXTENSION(GLuint, CreateProgram, void)                                                                              \
+GL_EXTENSION(void, LinkProgram, GLuint)                                                                                \
+GL_EXTENSION(void, UseProgram, GLuint program)                                                                         \
+/* Uniforms */                                                                                                         \
+GL_EXTENSION(GLint, GetUniformLocation, GLuint program, GLchar const* name)                                            \
+GL_EXTENSION(void, Uniform1f, GLint location, GLfloat v0)                                                              \
+GL_EXTENSION(void, Uniform1fv, GLint location, GLsizei count, GLfloat const* value)                                    \
+GL_EXTENSION(void, Uniform2f, GLint location, GLfloat v0, GLfloat v1)                                                  \
+GL_EXTENSION(void, Uniform2fv, GLint location, GLsizei count, GLfloat const* value)                                    \
+GL_EXTENSION(void, Uniform3f, GLint location, GLfloat v0, GLfloat v1, GLfloat v2)                                      \
+GL_EXTENSION(void, Uniform3fv, GLint location, GLsizei count, GLfloat const* value)                                    \
+GL_EXTENSION(void, Uniform4f, GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3)                          \
+GL_EXTENSION(void, Uniform4fv, GLint location, GLsizei count, GLfloat const* value)                                    \
+GL_EXTENSION(void, UniformMatrix2fv, GLint location, GLsizei count, GLboolean transpose, GLfloat const* value)         \
+GL_EXTENSION(void, UniformMatrix3fv, GLint location, GLsizei count, GLboolean transpose, GLfloat const* value)         \
+GL_EXTENSION(void, UniformMatrix4fv, GLint location, GLsizei count, GLboolean transpose, GLfloat const* value)
 
 #define GL_EXTENSION(ret, name, ...) using PFN_##name = ret GL_API (__VA_ARGS__); PFN_##name* gl##name;
 GL_EXTENSION_LIST
 #undef GL_EXTENSION
 
 
+// OpenGL Utility Functions ////////////////////////////////////////////////////////////////////////////////////////////
+auto static create_shader(char const* source, GLenum type) -> GLuint {
+    auto shader = glCreateShader(type);
+    glShaderSource(shader, 1, &source, {});
+    glCompileShader(shader);
+    return shader;
+}
+
+auto static create_shader_program(char const* vertex_shader_source, char const* fragment_shader_source) -> GLuint {
+    //auto vertex_shader = create_shader(vertex_shader_source, GL_VERTEX_SHADER);
+    auto fragment_shader = create_shader(fragment_shader_source, GL_FRAGMENT_SHADER);
+
+    auto shader_program = glCreateProgram();
+
+    //glAttachShader(shader_program, vertex_shader);
+    glAttachShader(shader_program, fragment_shader);
+    glLinkProgram(shader_program);
+    //glDeleteShader(vertex_shader);
+    glDeleteShader(fragment_shader);
+
+    return shader_program;
+}
+
+
 namespace xc::renderer {
-    // Renderer System /////////////////////////////////////////////////////////////////////////////////////////////////////
+    // Renderer System /////////////////////////////////////////////////////////////////////////////////////////////////
     auto initialize() -> bool {
         create_context();
 
@@ -107,13 +147,18 @@ namespace xc::renderer {
 
     // Resources //////////////////////////////////////////////////////////////////////////////////////////////////////
     auto create_shader(char const* vs_source, char const* fs_source) -> shader_t {
-        auto program = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fs_source);
+        auto program = create_shader_program({}, fs_source);
         // TODO: error handling
         return {program};
     }
 
-    auto set_shader_uniform_float3(shader_t const& shader, char const* name, float u1, float u2, float u3) -> void {
-        glUseProgram(shader.id);
-        glUniform3f(glGetUniformLocation(shader.id, name), u1, u2, u3);
-    }
+    auto bind_shader(shader_t const& shader) -> void { glUseProgram(shader.id); }
+
+    auto set_shader_uniform(shader_t const& shader, char const* name, float const value) -> void { glUniform1f(glGetUniformLocation(shader.id, name), value); }
+    auto set_shader_uniform(shader_t const& shader, char const* name, vector<float,2> const& value) -> void { glUniform1fv(glGetUniformLocation(shader.id, name), 2, reinterpret_cast<const GLfloat*>(&value)); }
+    auto set_shader_uniform(shader_t const& shader, char const* name, vector<float,3> const& value) -> void { glUniform1fv(glGetUniformLocation(shader.id, name), 3, reinterpret_cast<const GLfloat*>(&value)); }
+    auto set_shader_uniform(shader_t const& shader, char const* name, vector<float,4> const& value) -> void { glUniform1fv(glGetUniformLocation(shader.id, name), 4, reinterpret_cast<const GLfloat*>(&value)); }
+    auto set_shader_uniform(shader_t const& shader, char const* name, matrix<float,2,2> const& value) -> void { glUniformMatrix2fv(glGetUniformLocation(shader.id, name), 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&value)); }
+    auto set_shader_uniform(shader_t const& shader, char const* name, matrix<float,3,3> const& value) -> void { glUniformMatrix3fv(glGetUniformLocation(shader.id, name), 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&value)); }
+    auto set_shader_uniform(shader_t const& shader, char const* name, matrix<float,4,4> const& value) -> void { glUniformMatrix4fv(glGetUniformLocation(shader.id, name), 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&value)); }
 } // namespace xc::renderer
