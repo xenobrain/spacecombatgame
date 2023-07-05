@@ -12,6 +12,7 @@ extern "C" auto entry() -> void {
 
     while (running) {
         xc::platform::tick();
+        xc::renderer::tick();
     }
 
     xc::platform::uninitialize();

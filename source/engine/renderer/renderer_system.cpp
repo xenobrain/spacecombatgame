@@ -214,6 +214,7 @@ void main() {
 #include <Windows.h>
 #include <gl/GL.h>
 
+static HMODULE library;
 #define GLDECL APIENTRY
 
 using GLchar = char;
@@ -223,17 +224,20 @@ using GLsizeiptr = ptrdiff_t;
 using PFN_wglCreateContext = HGLRC(WINAPI*)(HDC);
 using PFN_wglDeleteContext = BOOL(WINAPI*)(HGLRC);
 using PFN_wglGetProcAddress = PROC(WINAPI*)(LPCSTR);
-using PFN_wglGetCurrentDC = HDC(WINAPI*)(void);
-using PFN_wglGetCurrentContext = HGLRC(WINAPI*)(void);
+//using PFN_wglGetCurrentDC = HDC(WINAPI*)(void);
+//using PFN_wglGetCurrentContext = HGLRC(WINAPI*)(void);
 using PFN_wglMakeCurrent = BOOL(WINAPI*)(HDC, HGLRC);
 
-static HDC hdc;
+extern HDC hdc;
 static HGLRC context;
 static const PIXELFORMATDESCRIPTOR pfd = {
         sizeof(pfd), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER, PFD_TYPE_RGBA,
         32, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 32, 0, 0, PFD_MAIN_PLANE, 0, 0, 0, 0
 };
 #endif // PLATFORM_WINDOWS
+
+using PFN_glRects = void (APIENTRY*)(GLshort x1, GLshort y1, GLshort x2, GLshort y2);
+static PFN_glRects gl_rects;
 
 #define GL_EXTENSION_LIST \
 GL_EXTENSION(GLuint, CreateShader, GLenum type)                                                             \
@@ -263,27 +267,22 @@ auto static compile_shader(char const* source, GLuint type) -> GLuint {
 
 namespace xc::renderer {
     auto initialize() -> bool {
-#if defined(PLATFORM_WINDOWS)
+        #if defined(PLATFORM_WINDOWS)
         SetPixelFormat(hdc, ChoosePixelFormat(hdc, &pfd), &pfd);
-
-        auto library = platform::load_library("OpenGL32.dll");
-
+        library = reinterpret_cast<HMODULE>(platform::load_library("OpenGL32.dll"));
         context = ((PFN_wglCreateContext)platform::load_function(library, "wglCreateContext"))(hdc);
         ((PFN_wglMakeCurrent)platform::load_function(library, "wglMakeCurrent"))(hdc, context);
 
-
         auto wgl_get_proc_address = (PFN_wglGetProcAddress)platform::load_function(library, "wglGetProcAddress");
+        gl_rects = (PFN_glRects)platform::load_function(library, "glRects");
 
-
-
-#define GL_EXTENSION(ret, name, ...)                    \
-        gl##name = (PFN_##name*)wgl_get_proc_address("gl" #name); \
+        #define GL_EXTENSION(ret, name, ...)                        \
+        gl##name = (PFN_##name*)wgl_get_proc_address("gl" #name);   \
         if (!gl##name) return false;
         GL_EXTENSION_LIST
-#undef GL_EXTENSION
+        #undef GL_EXTENSION
 
-#endif // PLATFORM_WINDOWS
-
+        #endif // PLATFORM_WINDOWS
 
         auto program = glCreateShaderProgramv(GL_FRAGMENT_SHADER, 1, &fs_shader);
         glUseProgram(program);
@@ -296,27 +295,25 @@ namespace xc::renderer {
     }
 
     auto uninitialize() -> void {
-#if defined(PLATFORM_WINDOWS)
-       // (PFN_wglDeleteContext)(platform::load_function(libary, "wglDeleteContext"))
-       //wglDeleteContext(context);
-#endif
+        #if defined(PLATFORM_WINDOWS)
+       (PFN_wglDeleteContext)(platform::load_function(library, "wglDeleteContext"));
+        #endif
     }
 
     auto tick() -> void {
-        //glRects(-1, -1, 1, 1);
+        gl_rects(-1, -1, 1, 1);
         swap();
     }
 
     ///// Shaders //////////////////////////////////////////////////////////////////////////////////////////////////////////
     auto create_shader(char const *vertex_shader_path, char const *fragment_shader_path) -> uint32_t {
-#if defined(PLATFORM_WINDOWS)
+        #if defined(PLATFORM_WINDOWS)
         auto vertex_shader_file = CreateFile(vertex_shader_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
                                              FILE_ATTRIBUTE_NORMAL, NULL);
         auto fragment_shader_file = CreateFile(fragment_shader_path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
                                                FILE_ATTRIBUTE_NORMAL, NULL);
 
         // error handling
-
         auto constexpr buffer_size = 4096;
         char vertex_shader_source[buffer_size];
         char fragment_shader_source[buffer_size];
@@ -327,12 +324,11 @@ namespace xc::renderer {
 
         CloseHandle(vertex_shader_file);
         CloseHandle(fragment_shader_file);
-#endif
+        #endif
 
         return 0u;
     }
 
-    /// Swapchain //////////////////////////////////////////////////////////////////////////////////////////////////////////
     auto swap() -> void { SwapBuffers(hdc); }
 } // namespace xc::renderer
 #endif
