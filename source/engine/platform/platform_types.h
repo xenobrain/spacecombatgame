@@ -5,4 +5,4 @@ namespace xc::platform {
 
 }
 
-#endif
+#endif // ENGINE_PLATFORM_PLATFORM_TYPES_H

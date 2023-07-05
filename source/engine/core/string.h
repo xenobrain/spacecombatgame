@@ -80,4 +80,4 @@ namespace xc {
     using string = string_t<char>;
 }
 
-#endif
+#endif // ENGINE_CORE_STRING_H

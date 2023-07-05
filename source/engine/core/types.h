@@ -81,4 +81,4 @@ namespace xc {
     };
 }
 
-#endif
+#endif // ENGINE_CORE_CORE_TYPES_H

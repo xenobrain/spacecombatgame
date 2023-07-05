@@ -19,4 +19,4 @@ namespace xc::platform {
 
 auto print(const char *format, ...) -> void;
 
-#endif
+#endif // ENGINE_PLATFORM_PLATFORM_SYSTEM_H
