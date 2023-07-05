@@ -211,17 +211,19 @@ target_compile_features(platform PRIVATE ${PROJECT_COMPILE_FEATURES})
 target_compile_options(platform PRIVATE ${PROJECT_COMPILE_OPTIONS})
 target_link_options(platform PRIVATE ${PROJECT_LINK_OPTIONS})
 target_sources(platform PRIVATE
-        source/engine/platform/platform_system.cpp
         source/engine/platform/platform_system.h
         source/engine/platform/platform_types.h)
 if(WIN32)
+    target_sources(platform PRIVATE source/engine/platform/windows/platform_system_windows.cpp)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     find_package(X11 REQUIRED)
     include_directories(${X11_INCLUDE_DIR})
     target_link_libraries(platform PRIVATE ${X11_LIBRARIES})
+    target_sources(platform PRIVATE source/engine/platform/linux/platform_system_linux.cpp)
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     find_library(COCOA_LIBRARY Cocoa)
     target_link_libraries(platform PRIVATE dl ${COCOA_LIBRARY})
+    target_sources(platform PRIVATE source/engine/platform/macos/platform_system_macos.cpp)
 endif()
 
 
@@ -233,7 +235,6 @@ target_compile_features(renderer PRIVATE ${PROJECT_COMPILE_FEATURES})
 target_compile_options(renderer PRIVATE ${PROJECT_COMPILE_OPTIONS})
 target_link_options(renderer PRIVATE ${PROJECT_LINK_OPTIONS})
 target_sources(renderer PRIVATE
-        source/engine/renderer/renderer_system.cpp
         source/engine/renderer/renderer_system.h
         source/engine/renderer/renderer_types.h)
 if(ENGINE_RENDERER STREQUAL METAL)
@@ -243,7 +244,6 @@ if(ENGINE_RENDERER STREQUAL METAL)
     target_compile_definitions(renderer PRIVATE RENDERER_METAL)
     if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         enable_language(OBJCXX)
-        set_source_files_properties(source/engine/renderer/renderer_system.cpp PROPERTIES LANGUAGE OBJCXX)
         set_source_files_properties(source/engine/renderer/metal/renderer_system_metal.cpp PROPERTIES LANGUAGE OBJCXX)
         target_sources(renderer PRIVATE source/engine/renderer/metal/renderer_system_metal.cpp)
     endif()
